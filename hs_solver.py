@@ -97,9 +97,6 @@ class HSSolver():
       # Total opening rate
       v_o_n = Xi_n / (rho_i * L) # firedrake.conditional(firedrake.And(firedrake.lt(Xi_n / (rho_i * L),0.0),firedrake.eq(S_n,0.0)),0.0,Xi_n / (rho_i * L))
       # Disallow negative opening rate where the channel area is 0
-      # v_o_n[v_o_n[firedrake.eq(S_n,0.0)] < 0.0] = 0.0
-      #v_o_n = firedrake.conditional(firedrake.And(firedrake.eq(S_n,0.0),le(Xi_n / (rho_i * L),0.0)),0.0,Xi_n / (rho_i * L))
-      # Calculate rate of channel size change
       dsdt = (v_o_n - v_c_n)
       return dsdt
       

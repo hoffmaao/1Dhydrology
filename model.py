@@ -45,8 +45,6 @@ class Glads1DModel():
     self.S = self.model_inputs['S_init']
     # Output directory
     self.out_dir = self.model_inputs['out_dir']
-    # Directory storing maps that are used to deal with CR functions in parallel
-    self.maps_dir = self.model_inputs['maps_dir']
 
     
     # If there is a dictionary of physical constants specified, use it. 

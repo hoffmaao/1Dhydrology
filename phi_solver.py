@@ -77,7 +77,6 @@ class PhiSolver(object):
     # Discharge through channels
     Q = -firedrake.Constant(k_c) * S_alpha * abs(phi.dx(0) + firedrake.Constant(phi_reg))**delta * phi.dx(0)
     # Approximate discharge of sheet in direction of channel
-    #q_c = -firedrake.Constant(k) * h**alpha * abs(dphi_ds + firedrake.Constant(phi_reg))**delta * dphi_ds
     q_c = -firedrake.Constant(k) * h**alpha * abs(phi.dx(0) + firedrake.Constant(phi_reg))**delta * phi.dx(0)
 
     # Energy dissipation 
@@ -87,7 +86,6 @@ class PhiSolver(object):
     # Another channel source term
     w_c = (Xi / firedrake.Constant(L)) * firedrake.Constant((1. / rho_i) - (1. / rho_w))
     
-
     ### Set up the PDE for the potential ###
     
     theta = firedrake.TestFunction(model.V_cg)
@@ -130,6 +128,7 @@ class PhiSolver(object):
     try :
       # Solve for potential
       firedrake.solve(self.F == 0, self.model.phi, self.model.d_bcs, J = self.J,solver_parameters={'snes_type': 'newtonls',                         'snes_rtol': 5e-6,
+                         'snes_rtol': 5e-6,
                          'snes_atol': 5e-3,
                          'pc_type': 'lu',
                          'snes_max_it': 50,
