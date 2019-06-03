@@ -139,9 +139,10 @@ class PhiSolver(object):
     except :
 
         # Try the solve again with a lower relaxation param
-        firedrake.solve(self.F == 0, self.model.phi, self.model.d_bcs, J = self.J,solver_parameters={'snes_type': 'newtonls',
-                         'snes_rtol': 5e-6,
-                         'snes_atol': 5e-3,
+        firedrake.solve(self.F == 0, self.model.phi, self.model.d_bcs, J = self.J,solver_parameters={
+                         'snes_type': 'newtonls',
+                         'snes_rtol': 5e-11,
+                         'snes_atol': 5e-10,
                          'pc_type': 'lu',
                          'snes_max_it': 50,
                          'mat_type': 'aij'})#, solver_parameters = self.model.newton_params)
