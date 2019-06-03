@@ -43,6 +43,8 @@ class Glads1DModel():
     self.d_bcs = self.model_inputs['d_bcs']
     # Channel areas
     self.S = self.model_inputs['S_init']
+    # Drainage width
+    self.width = self.model_inputs['width']
     # Output directory
     self.out_dir = self.model_inputs['out_dir']
 

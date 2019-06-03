@@ -54,21 +54,23 @@ class HSSolver():
     S0 = firedrake.interpolate(model.S,model.V_cg)
     S0 = S0.vector().array()
     # Length of h vector
-    h_len = len(h0) 
-    print(h_len)
+    h_len = len(h0)
 
     ### Set up the sheet height and channel area ODEs
     
     # Right hand side for the gap height ODE
     def h_rhs(t, h_n) :
       # Ensure that the sheet height is positive
-      h_n[h_n< 0.0] = firedrake.Constant(0.0)
+      h_n[h_n < 0.0] = firedrake.Constant(0.0)
+      # Get effective pressures
+      N_n = N.vector().array()
       # Sheet opening term
       w_n = u_b_n * (h_r - h_n) / l_r
       # Ensure that the opening term is non-negative
       w_n[w_n < 0.0] = firedrake.Constant(0.0)
       # Sheet closure term
-      v_n = A * h_n * N.vector().array()**firedrake.Constant(3.0)
+      v_n = firedrake.Constant(A) * h_n * N_n**firedrake.Constant(3.0)
+
       # Return the time rate of change of the sheet
       dhdt = w_n - v_n
       return dhdt
@@ -93,7 +95,7 @@ class HSSolver():
       # Dissipation melting due to turbulent flux
       # Creep closure
       Xi_n = abs(Q_n * phi_s.dat.data) + np.abs(l_c * q_n * phi_s.dat.data)
-      v_c_n = A * S_n * N_n**3
+      v_c_n = firedrake.Constant(A) * S_n * N_n**3
       # Total opening rate
       v_o_n = Xi_n / (rho_i * L) # firedrake.conditional(firedrake.And(firedrake.lt(Xi_n / (rho_i * L),0.0),firedrake.eq(S_n,0.0)),0.0,Xi_n / (rho_i * L))
       # Disallow negative opening rate where the channel area is 0

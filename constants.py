@@ -1,4 +1,4 @@
-# Copyright (C) 2017-2018 Andrew Hoffman hoffmaao@uw.edu
+# Copyright (C) 2018-2019 Andrew Hoffman hoffmaao@uw.edu
 # Constants for hydrology model
 
 ### Create a dictionary of physical constants

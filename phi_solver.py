@@ -24,6 +24,8 @@ class PhiSolver(object):
     phi_prev = model.phi_prev
     # Potential at overburden pressure
     phi_0 = model.phi_0
+    # Representative width of water system
+    width = model.width
     # Density of ice
     rho_i = model.pcs['rho_ice']
     # Density of water
@@ -53,17 +55,17 @@ class PhiSolver(object):
     c1 = e_v / (rho_w * g)
     # Regularization parameter
     phi_reg = firedrake.Constant(1e-15)
-    
-  
+
     ### Set up the sheet model 
 
     # Expression for effective pressure in terms of potential
     N = phi_0 - phi
     # Derivative of phi
     dphi_tmp = phi.dx(0)
+
     dphi_ds = firedrake.interpolate(dphi_tmp,model.V_cg)
     # Flux vector
-    q = -firedrake.Constant(k) * h**alpha * abs(dphi_ds + phi_reg)**(delta) * dphi_ds
+    q = -firedrake.Constant(k) * h**alpha * abs(phi.dx(0) + phi_reg)**(delta) * phi.dx(0)
     # Opening term 
     w = firedrake.conditional(firedrake.gt(h_r - h, 0.0), u_b * (h_r - h) / l_r, 0.0)
     # Closing term
@@ -77,7 +79,7 @@ class PhiSolver(object):
     # Discharge through channels
     Q = -firedrake.Constant(k_c) * S_alpha * abs(phi.dx(0) + firedrake.Constant(phi_reg))**delta * phi.dx(0)
     # Approximate discharge of sheet in direction of channel
-    q_c = -firedrake.Constant(k) * h**alpha * abs(phi.dx(0) + firedrake.Constant(phi_reg))**delta * phi.dx(0)
+    q_c = (-firedrake.Constant(k) * h**alpha * abs(phi.dx(0) + firedrake.Constant(phi_reg))**delta * phi.dx(0))*l_c
 
     # Energy dissipation 
     Xi = abs(Q * phi.dx(0)) + abs(firedrake.Constant(l_c) * q_c * dphi_ds)
@@ -91,15 +93,14 @@ class PhiSolver(object):
     theta = firedrake.TestFunction(model.V_cg)
     
     # Constant in front of storage term
-    C1 = firedrake.Constant(c1)
+    C1 = firedrake.Constant(c1)*width
     # Storage term
     F_s = C1 * (phi - phi_prev) * theta * firedrake.dx
     # Sheet contribution to PDE
-    F_s += dt * (-theta.dx(0)*q + (w - v - m) * theta) * firedrake.dx 
-    
+    F_s += dt * (-theta.dx(0)*q*width + (w - v - m) * width * theta) * firedrake.dx
     # Add any non-zero Neumann boundary conditions
     for (m, c) in model.n_bcs: 
-      F_s += dt * firedrake.Constant(c) * theta * m
+        F_s += dt * firedrake.Constant(c) * theta * m
     
     # Channel contribution to PDE
     F_c = dt * ((-theta.dx(0)) * Q + (w_c - v_c) * theta('+') )* firedrake.dx
@@ -119,7 +120,7 @@ class PhiSolver(object):
     self.dt = dt
 
 
-  # Steps the potential forward by dt. Returns true if the Newton solver converged or false if it
+  # Steps the potential forward by dt. Returns true if the  converged or false if it
   # had to use a smaller relaxation parameter.
   def step(self, dt):
 
@@ -127,37 +128,29 @@ class PhiSolver(object):
     
     try :
       # Solve for potential
-      firedrake.solve(self.F == 0, self.model.phi, self.model.d_bcs, J = self.J,solver_parameters={'snes_type': 'newtonls',                         'snes_rtol': 5e-6,
-                         'snes_rtol': 5e-6,
-                         'snes_atol': 5e-3,
-                         'pc_type': 'lu',
-                         'snes_max_it': 50,
-                         'mat_type': 'aij'})#, solver_parameters = self.model.newton_params)
+        firedrake.solve(self.F == 0, self.model.phi, self.model.d_bcs, J = self.J,solver_parameters={'snes_monitor': None,
+                        'snes_view': None,
+                        'ksp_monitor_true_residual': None,
+                        'snes_converged_reason': None,
+                        'ksp_converged_reason': None})#, solver_parameters = self.model.newton_params)
 
       # Derive values from the new potential 
-      self.model.update_phi()
+        self.model.update_phi()
     except :
-      # Remember the relaxation parameter
 
-      # Try the solve again with a lower relaxation param
-      #self.model.newton_params['newton_solver']['relaxation_parameter'] = 0.7
-      #self.model.newton_params['newton_solver']['error_on_nonconvergence'] = False
-      firedrake.solve(self.F == 0, self.model.phi, self.model.d_bcs, J = self.J,solver_parameters={'snes_type': 'newtonls',
+        # Try the solve again with a lower relaxation param
+        firedrake.solve(self.F == 0, self.model.phi, self.model.d_bcs, J = self.J,solver_parameters={'snes_type': 'newtonls',
                          'snes_rtol': 5e-6,
                          'snes_atol': 5e-3,
                          'pc_type': 'lu',
                          'snes_max_it': 50,
                          'mat_type': 'aij'})#, solver_parameters = self.model.newton_params)
 
-      # Derive values from potential
-      self.model.update_phi()
+        # Derive values from potential
+        self.model.update_phi()
       
-      # Set the Newton parameters back 
-      #self.model.newton_params['newton_solver']['relaxation_parameter'] = r
-      #self.model.newton_params['newton_solver']['error_on_nonconvergence'] = True
-      
-      # Didn't converge with standard params
-      return False
+        # Didn't converge with standard params
+        return False
 
     # Did converge with standard params
     return True
