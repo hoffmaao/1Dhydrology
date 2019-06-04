@@ -13,19 +13,19 @@ pcs['rho_water'] = 1000.0
 # Density of ice (kg / m^3)
 pcs['rho_ice'] = 910.0
 # Gravitational acceleration (m / s^2)
-pcs['g'] = 9.81 
+pcs['g'] = 9.8 
 # Flow rate factor of ice (1 / Pa^3 * s) 
-pcs['A'] = 5.0e-25
+pcs['A'] = 2.25e-25
 # Average bump height (m)
 pcs['h_r'] = 0.1
 # Typical spacing between bumps (m)
-pcs['l_r'] = 8.0
+pcs['l_r'] = 2.0
 # Sheet width under channel (m)
 pcs['l_c'] = 2.0          
 # Sheet conductivity (m^(7/4) / kg^(1/2))
-pcs['k'] = 1e-2
-# Channel conductivity (m^(7/4) / kg^(1/2))
-pcs['k_c'] = 1e-1
+pcs['k'] = .005
+# Channel conductivity (m^(3/2) / kg^(1/2))
+pcs['k_c'] = .195
 # Specific heat capacity of ice (J / (kg * K))
 pcs['c_w'] = 4.22e3
 # Pressure melting coefficient (J / (kg * K))

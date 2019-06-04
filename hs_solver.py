@@ -13,7 +13,9 @@ class HSSolver():
     # Effective pressure
     N = firedrake.interpolate(model.N,model.V_cg)
     # hydropotential
-    phi = firedrake.interpolate(model.phi,model.V_cg) 
+    phi = firedrake.interpolate(model.phi,model.V_cg)
+    # hydropotential at zero bed elvation
+    phi_m = firedrake.interpolate(model.phi_m,model.V_cg) 
     # Cavity gap height
     h = firedrake.interpolate(model.h,model.V_cg)
     # Channel height
@@ -28,6 +30,8 @@ class HSSolver():
     h_r = model.pcs['h_r']
     # Density of ice
     rho_i = model.pcs['rho_ice']
+    # Density of water
+    rho_water = model.pcs['rho_water']
     # Latent heat
     L = model.pcs['L']
     # Sheet conductivity
@@ -36,14 +40,15 @@ class HSSolver():
     k_c = model.pcs['k_c']
     # Sheet width under channel
     l_c = model.pcs['l_c']
+    # Clapeyron slope
+    c_t = model.pcs['c_t']
+    # Specific heat capacity of water
+    c_w = model.pcs['c_w']
     # Exponent
     alpha = model.pcs['alpha']
     delta = model.pcs['delta']
     # Regularization parameter
-    phi_reg = firedrake.Constant(1e-16)   
-    
-    
-    ### Static arrays used in the ODE rhs
+    phi_reg = firedrake.Constant(1e-15)   
     
     # Vector for sliding speed
     u_b_n = firedrake.interpolate(model.u_b,model.V_cg)
@@ -56,7 +61,6 @@ class HSSolver():
     # Length of h vector
     h_len = len(h0)
 
-    ### Set up the sheet height and channel area ODEs
     
     # Right hand side for the gap height ODE
     def h_rhs(t, h_n) :
@@ -73,33 +77,46 @@ class HSSolver():
 
       # Return the time rate of change of the sheet
       dhdt = w_n - v_n
+
       return dhdt
       
     # Right hand side for the channel area ODE
     def S_rhs(t, S_n):
-      # Ensure that the channel area is positive
+      # Channel area is positive
       S_n[S_n < 0.0] = firedrake.Constant(0.0)
-      # Get effective pressures
+      # Effective pressures
       N_n = N.vector().array()
-      # Get midpoint values of sheet thickness
+      # Sheet thickness
       h_n = h.vector().array()
-      # Array form of the derivative of the potential 
+ 
+      
       phi_grad = model.phi.dx(0)
-      phi_s = firedrake.interpolate(phi_grad,model.V_cg)
-      #phi_s = phi.dx(0) # This is one obvious problem (How do we define derivatives of arrays?)
+      phi_s = firedrake.interpolate(phi_grad,model.V_cg)      
       
       # Along channel flux
       Q_n = -firedrake.Constant(k_c) * S_n**firedrake.Constant(alpha) * np.abs(phi_s.dat.data + phi_reg)**firedrake.Constant(delta) * phi_s.dat.data
       # Flux of sheet under channel
       q_n = -firedrake.Constant(k) * h_n**firedrake.Constant(alpha) * np.abs(phi_s.dat.data + phi_reg)**firedrake.Constant(delta) * phi_s.dat.data
       # Dissipation melting due to turbulent flux
-      # Creep closure
       Xi_n = abs(Q_n * phi_s.dat.data) + np.abs(l_c * q_n * phi_s.dat.data)
+      
+      # Creep closure
       v_c_n = firedrake.Constant(A) * S_n * N_n**3
-      # Total opening rate
-      v_o_n = Xi_n / (rho_i * L) # firedrake.conditional(firedrake.And(firedrake.lt(Xi_n / (rho_i * L),0.0),firedrake.eq(S_n,0.0)),0.0,Xi_n / (rho_i * L))
+      
+      # pressure melting term
+      pw=phi-phi_m
+      pw_s=pw.dx(0)
+      pw_s=firedrake.interpolate(pw_s,model.V_cg)
+      f=firedrake.Constant(0.0)
+      f=firedrake.Constant(1.0) # firedrake.conditional(firedrake.Or(S_n>0.0,q_n*pw.dx(0)),1.0,0.0)
+      II_n = -c_t*c_w*rho_water*0.3* (Q_n+f*l_c*q_n)*pw_s.dat.data
+      # Total opening rate (dissapation of potential energy and pressure melting)
+      v_o_n = (Xi_n - II_n) / (rho_i * L)
+      
       # Disallow negative opening rate where the channel area is 0
+      #v_o_n=firedrake.conditional(firedrake.And(firedrake.lt(Xi_n / (rho_i * L),0.0),firedrake.eq(S_n,0.0)),0.0,Xi_n / (rho_i * L))
       dsdt = (v_o_n - v_c_n)
+
       return dsdt
       
     # Combined right hand side for h and S
@@ -107,23 +124,18 @@ class HSSolver():
       Ys = np.split(Y, [h_len])
       h_n = Ys[0]
       S_n = Ys[1]
-      
       dsdt = S_rhs(t, S_n)
       dhdt = h_rhs(t, h_n)
-      
       return np.hstack((dhdt, dsdt))
     
     # ODE solver initial condition
     Y0 = np.hstack((h0, S0))
     # Set up ODE solver
-    ode_solver = ode(rhs).set_integrator('vode', method = 'adams', max_step = 60.0 * 5.0)
+    ode_solver = ode(rhs).set_integrator('vode', method = 'adams', max_step = 20.0)
     ode_solver.set_initial_value(Y0, t0)
 
 
-    ### Set local variables
-    self.Y0=Y0    
-    self.rhs=rhs
-    self.S_rhs= S_rhs
+    # Set local variables
     self.ode_solver = ode_solver
     self.model = model
     self.h_len = h_len
@@ -138,7 +150,7 @@ class HSSolver():
     self.model.h.vector().apply("insert")
     self.model.S.vector().set_local(Y[1])
     self.model.S.vector().apply("insert")
-    
+
     # Update S**alpha
     self.model.update_S_alpha()
   
