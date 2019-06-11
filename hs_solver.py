@@ -1,8 +1,8 @@
+"""Solves ODEs for the sheet height h and channel area S."""
+
 import firedrake
 from scipy.integrate import ode
 import numpy as np
-
-"""Solves ODEs for the sheet height h and channel area S."""
 
 
 class HSSolver:
@@ -48,7 +48,7 @@ class HSSolver:
         alpha = model.pcs["alpha"]
         delta = model.pcs["delta"]
         # Regularization parameter
-        phi_reg = firedrake.Constant(1e-15)
+        phi_reg = 1e-15
 
         # Vector for sliding speed
         u_b_n = firedrake.interpolate(model.u_b, model.V_cg)
@@ -66,15 +66,15 @@ class HSSolver:
         # Right hand side for the gap height ODE
         def h_rhs(t, h_n):
             # Ensure that the sheet height is positive
-            h_n[h_n < 0.0] = firedrake.Constant(0.0)
+            h_n[h_n < 0.0] = 0.0
             # Get effective pressures
-            N_n = N.vector().array()
+            N_n = N.dat.data_ro
             # Sheet opening term
             w_n = u_b_n * (h_r - h_n) / l_r
             # Ensure that the opening term is non-negative
-            w_n[w_n < 0.0] = firedrake.Constant(0.0)
+            w_n[w_n < 0.0] = 0.0
             # Sheet closure term
-            v_n = firedrake.Constant(A) * h_n * N_n ** firedrake.Constant(3.0)
+            v_n = A * h_n * N_n ** 3.0
 
             # Return the time rate of change of the sheet
             dhdt = w_n - v_n
@@ -84,51 +84,52 @@ class HSSolver:
         # Right hand side for the channel area ODE
         def S_rhs(t, S_n):
             # Channel area is positive
-            S_n[S_n < 0.0] = firedrake.Constant(0.0)
+            S_n[S_n < 0.0] = 0.0
             # Effective pressures
-            N_n = N.vector().array()
+            N_n = N.dat.data_ro
             # Sheet thickness
-            h_n = h.vector().array()
+            h_n = h.dat.data_ro
 
             phi_grad = model.phi.dx(0)
             phi_s = firedrake.interpolate(phi_grad, model.V_cg)
 
             # Along channel flux
             Q_n = (
-                -firedrake.Constant(k_c)
-                * S_n ** firedrake.Constant(alpha)
-                * np.abs(phi_s.dat.data_ro + phi_reg) ** firedrake.Constant(delta)
+                -k_c
+                * S_n ** alpha
+                * np.abs(phi_s.dat.data_ro + phi_reg) ** delta
                 * phi_s.dat.data_ro
             )
             # Flux of sheet under channel
             q_n = (
-                -firedrake.Constant(k)
-                * h_n ** firedrake.Constant(alpha)
-                * np.abs(phi_s.dat.data_ro + phi_reg) ** firedrake.Constant(delta)
+                -k
+                * h_n ** alpha
+                * np.abs(phi_s.dat.data_ro + phi_reg) ** delta
                 * phi_s.dat.data_ro
             )
             # Dissipation melting due to turbulent flux
             Xi_n = abs(Q_n * phi_s.dat.data_ro) + np.abs(l_c * q_n * phi_s.dat.data_ro)
 
             # Creep closure
-            v_c_n = firedrake.Constant(A) * S_n * N_n ** 3
+            v_c_n = A * S_n * N_n ** 3
 
             # pressure melting term
             pw = phi - phi_m
             pw_s = pw.dx(0)
             pw_s = firedrake.interpolate(pw_s, model.V_cg)
-            f = firedrake.Constant(0.0)
-            f = firedrake.Constant(
-                1.0
-            )  # firedrake.conditional(firedrake.Or(S_n>0.0,q_n*pw.dx(0)),1.0,0.0)
+            f=np.zeros(np.size(q_n))
+            f[(S_n > 0) & (phi_s.dat.data_ro*q_n>0.0) ]=1.0
             II_n = (
                 -c_t * c_w * rho_water * 0.3 * (Q_n + f * l_c * q_n) * pw_s.dat.data_ro
             )
             # Total opening rate (dissapation of potential energy and pressure melting)
             v_o_n = (Xi_n - II_n) / (rho_i * L)
-
+            #print(v_o_n)
             # Disallow negative opening rate where the channel area is 0
-            # v_o_n=firedrake.conditional(firedrake.And(firedrake.lt(Xi_n / (rho_i * L),0.0),firedrake.eq(S_n,0.0)),0.0,Xi_n / (rho_i * L))
+            #v_o_n[S_n == 0.0] < 0.0
+            v_o_n[v_o_n[S_n == 0.0] < 0.0] = 0.0
+            #v_o_n=np.where(Xi_n - II_n / (rho_i * L)<0.0),S_n>0.0)),0.0,Xi_n / (rho_i * L))
+            
             dsdt = v_o_n - v_c_n
 
             return dsdt

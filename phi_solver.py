@@ -7,14 +7,13 @@ import firedrake
 class PhiSolver(object):
     def __init__(self, model):
 
-        # Get melt rate
+        # melt rate
         m = model.m
         # Sheet height
         h = model.h
-        # Channel areas
+        # Channel area
         S = model.S
-        # This function stores the value of S**alpha. It's necessary due to a bug
-        # in firedrake that causes problems exponentiating a CR function
+        # This function stores the value of S**alpha. 
         S_alpha = model.S_alpha
         # hydropotential at zero bed elvation
         phi_m = model.phi_m
@@ -102,36 +101,33 @@ class PhiSolver(object):
             * h ** alpha
             * abs(phi.dx(0) + firedrake.Constant(phi_reg)) ** delta
             * phi.dx(0)
-        ) * l_c
+        )* l_c
 
         # Energy dissipation
         Xi = abs(Q_c * phi.dx(0)) + abs(firedrake.Constant(l_c) * q_c * dphi_ds)
-        # Channel creep closure rate
-        # pressure melting term
+
+        # pressure melting
         pw = phi - phi_m
         pw_s = pw.dx(0)
         pw_s = firedrake.interpolate(pw_s, model.V_cg)
-        f = firedrake.Constant(0.0)
-        f = firedrake.Constant(
-            1.0
-        )  # firedrake.conditional(firedrake.Or(S_n>0.0,q_n*pw.dx(0)),1.0,0.0)
+        f = firedrake.conditional(firedrake.Or(S>0.0,q_c*pw.dx(0)> 0.0),1.0,0.0)
         II_n = -c_t * c_w * rho_water * 0.3 * (Q_c + f * l_c * q_c) * pw_s
         # Total opening rate (dissapation of potential energy and pressure melting)
-
-        v_c = firedrake.Constant(A) * S * N ** 3
-        # Another channel source term
         w_c = ((Xi - II_n) / firedrake.Constant(L)) * firedrake.Constant(
-            (1.0 / rho_ice) - (1.0 / rho_water)
-        )
+            (1.0 / rho_ice) - (1.0 / rho_water))
 
+        # closing term assocaited with creep closure
+        v_c = firedrake.Constant(A) * S * N ** firedrake.Constant(3.0)
+        
         ### Set up the PDE for the potential ###
-
         theta = firedrake.TestFunction(model.V_cg)
 
         # Constant in front of storage term
         C1 = firedrake.Constant(c1) * width
         # Storage term
         F_s = C1 * (phi - phi_prev) * theta * firedrake.dx
+        
+        tmp=firedrake.assemble(width)
         # Sheet contribution to PDE
         F_s += (
             dt
@@ -146,7 +142,6 @@ class PhiSolver(object):
         F_c = dt * ((-theta.dx(0)) * Q_c + (w_c - v_c) * theta("+")) * firedrake.dx
         # Variational form
         F = F_s + F_c
-
         # Get the Jacobian
         dphi = firedrake.TrialFunction(model.V_cg)
         J = firedrake.derivative(F, phi, dphi)
@@ -154,6 +149,7 @@ class PhiSolver(object):
         ### Assign local variables
 
         self.F = F
+        self.tmp = tmp
         self.J = J
         self.model = model
         self.dt = dt
@@ -163,8 +159,9 @@ class PhiSolver(object):
     def step(self, dt):
 
         self.dt.assign(dt)
-
+        tmp = firedrake.assemble(self.tmp)
         try:
+
             # Solve for potential
             firedrake.solve(
                 self.F == 0,

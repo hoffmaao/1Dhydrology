@@ -13,9 +13,9 @@ as the acceleration due to gravity, the density, of ice and water, etc.
 """
 pcs={}
 # Seconds per day
-pcs["day"] = 60.0 * 60.0 * 24.0
+pcs["spd"] = 60.0 * 60.0 * 24.0
 # Seconds per year
-pcs["year"] = 60.0 * 60.0 * 24.0 * 365.0
+pcs["spy"] = 60.0 * 60.0 * 24.0 * 365.0
 # Density of water 
 pcs["rho_water"] = 1000.0 # kg / m^3
 # Density of ice 
@@ -41,8 +41,8 @@ pcs["c_t"] = 7.5e-8 # J / (kg * K)
 # Latent heat 
 pcs["L"] = 3.34e5 # J / kg
 # Void storage ratio
-pcs["e_v"] = 1e-3
+pcs["e_v"] = 0.0 #1e-3
 # Exponents
 pcs["alpha"] = 5.0 / 4.0
 pcs["beta"] = 3.0 / 2.0
-pcs["delta" = pcs["beta"] - 2.0
+pcs["delta"] = pcs["beta"] - 2.0

@@ -3,3 +3,4 @@
 *.pvd
 *.vtu
 *.pvtu
+*checkpoint.ipynb
