@@ -67,22 +67,20 @@ class PhiSolver(object):
         # Expression for effective pressure in terms of potential
         N = phi_0 - phi
         # Derivative of phi
-        dphi_tmp = phi.dx(0)
 
-        dphi_ds = firedrake.interpolate(dphi_tmp, model.V_cg)
-        # Flux vector
+        # Flux vector for sheet
         q_s = (
             -firedrake.Constant(k)
             * h ** alpha
-            * abs(phi.dx(0) + phi_reg) ** (delta)
+            * (phi.dx(0)*phi.dx(0) + phi_reg) ** (delta/2.0)
             * phi.dx(0)
         )
         # Opening term
         w = firedrake.conditional(
-            firedrake.gt(h_r - h, 0.0), u_b * (h_r - h) / l_r, 0.0
+            firedrake.gt(firedrake.Constant(h_r) - h, firedrake.Constant(0.0)), u_b * (firedrake.Constant(h_r) - h) / firedrake.Constant(l_r), firedrake.Constant(0.0)
         )
         # Closing term
-        v = firedrake.Constant(A) * h * N ** 3
+        v = firedrake.Constant(A) * h * N ** 3.0
         # Time step
         dt = firedrake.Constant(1.0)
 
@@ -101,10 +99,10 @@ class PhiSolver(object):
             * h ** alpha
             * abs(phi.dx(0) + firedrake.Constant(phi_reg)) ** delta
             * phi.dx(0)
-        )* l_c
+        )
 
         # Energy dissipation
-        Xi = abs(Q_c * phi.dx(0)) + abs(firedrake.Constant(l_c) * q_c * dphi_ds)
+        Xi = abs(Q_c * phi.dx(0)) + abs(firedrake.Constant(l_c) * q_c * phi.dx(0))
 
         # pressure melting
         pw = phi - phi_m
@@ -123,11 +121,10 @@ class PhiSolver(object):
         theta = firedrake.TestFunction(model.V_cg)
 
         # Constant in front of storage term
-        C1 = firedrake.Constant(c1) * width
+        C1 = firedrake.Constant(c1) * width 
         # Storage term
         F_s = C1 * (phi - phi_prev) * theta * firedrake.dx
         
-        tmp=firedrake.assemble(width)
         # Sheet contribution to PDE
         F_s += (
             dt
@@ -140,6 +137,7 @@ class PhiSolver(object):
 
         # Channel contribution to PDE
         F_c = dt * ((-theta.dx(0)) * Q_c + (w_c - v_c) * theta("+")) * firedrake.dx
+
         # Variational form
         F = F_s + F_c
         # Get the Jacobian
@@ -149,7 +147,6 @@ class PhiSolver(object):
         ### Assign local variables
 
         self.F = F
-        self.tmp = tmp
         self.J = J
         self.model = model
         self.dt = dt
@@ -159,7 +156,7 @@ class PhiSolver(object):
     def step(self, dt):
 
         self.dt.assign(dt)
-        tmp = firedrake.assemble(self.tmp)
+
         try:
 
             # Solve for potential

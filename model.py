@@ -7,8 +7,8 @@
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
 #
-# The full text of the license can be found in the file LICENSE in the
-# icepack source directory or at <http://www.gnu.org/licenses/>.
+# The full text of the license can be found at 
+# <http://www.gnu.org/licenses/>.
 
 
 import firedrake
@@ -94,7 +94,6 @@ class Glads1DModel:
         self.t = 0.0
 
         ### Output files
-        # self.ff_out = firedrake.FacetFunctionDouble(self.mesh)
         self.S_out = firedrake.File(self.out_dir + "S.pvd")
         self.h_out = firedrake.File(self.out_dir + "h.pvd")
         self.phi_out = firedrake.File(self.out_dir + "phi.pvd")
@@ -188,7 +187,7 @@ class Glads1DModel:
     def update_S_alpha(self):
         alpha = self.pcs["alpha"]
         self.S_alpha.vector().set_local(self.S.vector().array() ** alpha)
-
+        self.S_alpha.vector().apply('insert')
     # Write h, S, pfo, and phi to pvd files
     def write_pvds(self):
         self.S.assign(firedrake.interpolate(self.S, self.V_cg))

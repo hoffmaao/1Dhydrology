@@ -29,7 +29,7 @@ class HSSolver:
         # Bump height
         h_r = model.pcs["h_r"]
         # Density of ice
-        rho_i = model.pcs["rho_ice"]
+        rho_ice = model.pcs["rho_ice"]
         # Density of water
         rho_water = model.pcs["rho_water"]
         # Latent heat
@@ -112,7 +112,6 @@ class HSSolver:
 
             # Creep closure
             v_c_n = A * S_n * N_n ** 3
-
             # pressure melting term
             pw = phi - phi_m
             pw_s = pw.dx(0)
@@ -123,15 +122,11 @@ class HSSolver:
                 -c_t * c_w * rho_water * 0.3 * (Q_n + f * l_c * q_n) * pw_s.dat.data_ro
             )
             # Total opening rate (dissapation of potential energy and pressure melting)
-            v_o_n = (Xi_n - II_n) / (rho_i * L)
-            #print(v_o_n)
+            v_o_n = (Xi_n - II_n) / (rho_ice * L)
             # Disallow negative opening rate where the channel area is 0
-            #v_o_n[S_n == 0.0] < 0.0
-            v_o_n[v_o_n[S_n == 0.0] < 0.0] = 0.0
-            #v_o_n=np.where(Xi_n - II_n / (rho_i * L)<0.0),S_n>0.0)),0.0,Xi_n / (rho_i * L))
-            
-            dsdt = v_o_n - v_c_n
+            v_o_n[(S_n==0.0) & (v_o_n<0.0)] = 0.0
 
+            dsdt = v_o_n - v_c_n
             return dsdt
 
         # Combined right hand side for h and S
@@ -146,7 +141,7 @@ class HSSolver:
         # ODE solver initial condition
         Y0 = np.hstack((h0, S0))
         # Set up ODE solver
-        ode_solver = ode(rhs).set_integrator("vode", method="adams", max_step=60.0 * 5)
+        ode_solver = ode(rhs).set_integrator("vode",method="adams", max_step=60.0 * 5)
         ode_solver.set_initial_value(Y0, t0)
 
         # Set local variables
@@ -164,7 +159,6 @@ class HSSolver:
         self.model.h.vector().apply("insert")
         self.model.S.vector().set_local(Y[1])
         self.model.S.vector().apply("insert")
-
         # Update S**alpha
         self.model.update_S_alpha()
 
